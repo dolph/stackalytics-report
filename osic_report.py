@@ -20,6 +20,16 @@ LAUNCHPAD_IDS = [
 ]
 
 
+def compute_date_range(days_ago):
+    utc_today = datetime.datetime.utcnow()
+    delta = datetime.timedelta(days=days_ago)
+    epoch_dt = datetime.datetime(1970, 1, 1)
+
+    end_epoch = int((utc_today - epoch_dt).total_seconds())
+    start_epoch = int((utc_today - delta - epoch_dt).total_seconds())
+    return start_epoch, end_epoch
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Generate a report from Stackalytics on the collaboration '
@@ -44,15 +54,10 @@ def main():
     # resp = requests.get(url)
     # resp.raise_for_status()
 
-    utc_today = datetime.datetime.utcnow()
-    delta = datetime.timedelta(days=args.reporting_period)
-    week_ago = utc_today - delta
-    epoch_dt = datetime.datetime(1970, 1, 1)
-    today_epoch = int((utc_today - epoch_dt).total_seconds())
-    week_ago_epoch = int((week_ago - epoch_dt).total_seconds())
-
     url = 'http://stackalytics.com/api/1.0/stats/engineers'
-    params = {'start_date': week_ago_epoch, 'end_date': today_epoch}
+    params = dict()
+    params['start_date'], params['end_date'] = compute_date_range(
+        args.reporting_period)
     resp = requests.get(url, params=params)
     resp.raise_for_status()
     engineering_data = resp.json()['stats']
