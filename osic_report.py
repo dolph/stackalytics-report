@@ -50,36 +50,7 @@ def GET(url, params):
     return data
 
 
-def main():
-    global DEBUG
-
-    parser = argparse.ArgumentParser(
-        description='Generate a report from Stackalytics on the collaboration '
-                    'between two organizations')
-    parser.add_argument(
-        '--debug', action='store_true', default=False,
-        help='Enable debugging output.')
-    parser.add_argument(
-        '--reporting-period', type=int, default=7,
-        help='Period (in days) to report on.')
-    args = parser.parse_args()
-    DEBUG = args.debug
-
-    # FIXME(lbragstad): For some reason the following request doesn't work
-    # against stackalytics with python requests. It does work if you copy that
-    # same url and use it with cURL. I have no idea why. Whenever you introduce
-    # query parameters to the base url and pass them to stackalytics - you get
-    # a 404 regardless. If you just use the base url
-    # (http://stackalytics.com/api/1.0/stats/engineers) you'll get a successful
-    # response from the stackalytics API. So, my hack-tastic workaround it to
-    # get the base url and do my own "query parameter filtering" client-side
-    # :(
-    # url = 'http://stackalytics.com/api/1.0/stats/engineers'
-    # params = {'user_id': 'ldbragst', 'project_type': 'keystone'}
-    # resp = requests.get(url, params=params, allow_redirects=False)
-    # resp = requests.get(url)
-    # resp.raise_for_status()
-
+def main(args):
     params = dict()
     params['start_date'], params['end_date'] = compute_date_range(
         args.reporting_period)
@@ -110,4 +81,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(
+        description='Generate a report from Stackalytics on the collaboration '
+                    'between two organizations')
+    parser.add_argument(
+        '--debug', action='store_true', default=False,
+        help='Enable debugging output.')
+    parser.add_argument(
+        '--reporting-period', type=int, default=7,
+        help='Period (in days) to report on.')
+    args = parser.parse_args()
+    DEBUG = args.debug
+    main(args)
