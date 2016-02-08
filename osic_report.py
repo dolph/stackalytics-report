@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import json
 
 import requests
 
@@ -35,6 +36,9 @@ def main():
         description='Generate a report from Stackalytics on the collaboration '
                     'between two organizations')
     parser.add_argument(
+        '--debug', action='store_true', default=False,
+        help='Enable debugging output.')
+    parser.add_argument(
         '--reporting-period', type=int, default=7,
         help='Period (in days) to report on.')
     args = parser.parse_args()
@@ -59,10 +63,14 @@ def main():
     params['start_date'], params['end_date'] = compute_date_range(
         args.reporting_period)
     resp = requests.get(url, params=params)
+    if args.debug:
+        print('GET %s' % resp.url)
     resp.raise_for_status()
-    engineering_data = resp.json()['stats']
+    data = resp.json()
+    if args.debug:
+        print(json.dumps(data, sort_keys=True, indent=4))
     osic_report = dict()
-    for engineer in engineering_data:
+    for engineer in data['stats']:
         for lp_id in LAUNCHPAD_IDS:
             if lp_id in engineer['id']:
                 osic_report[engineer['id']] = engineer
