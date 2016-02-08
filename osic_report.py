@@ -1,67 +1,33 @@
+import argparse
 import datetime
 
 import requests
 
 
 LAUNCHPAD_IDS = [
-'xuhj',
-'ankur-gupta-f',
-'annegentle',
-'alexandra-settle',
-'byron-mccollum',
-'bmoss',
-'brian-rosmaita',
-'kevin-carter',
-'daz',
-'wei-d-chen',
-'dolph',
-'dstanek',
-'egle',
-'ganesh-mahalingam',
-'gus',
-'hemanth-makkapati',
-'joshua.hesketh',
-'johngarbutt',
-'jim-rollenhagen',
-'kennycjohnston',
-'ldbragst',
-'lianhau-lu',
-'loquacity',
-'madorn',
-'malini-k-bhandaru',
-'manjeet-s-bhatia',
-'matt-O',
-'rackerhacker',
-'mikalstill',
-'john-d-perkins',
-'mrda',
-'npustchi',
-'neillc',
-'rnortman',
-'ntpttr',
-'jesse-pretorius',
-'paul-dardeau',
-'paul-e-luse',
-'r1chardj0n3s',
-'ronald-de-rose',
-'ionosphere80',
-'sfinucane',
-'shashirekha-j-gundur',
-'sumant-murke',
-'amy-marrich',
-'steve-lewis',
-'o-tony',
-'xek',
-'yalei-wang',
-'yamahata',
-'saisrikiran-mudigonda',
-'electrocucaracha',
-'castulo-martinez',
-'joshua-l-white'
+    'xuhj', 'ankur-gupta-f', 'annegentle', 'alexandra-settle',
+    'byron-mccollum', 'bmoss', 'brian-rosmaita', 'kevin-carter', 'daz',
+    'wei-d-chen', 'dolph', 'dstanek', 'egle', 'ganesh-mahalingam', 'gus',
+    'hemanth-makkapati', 'joshua.hesketh', 'johngarbutt', 'jim-rollenhagen',
+    'kennycjohnston', 'ldbragst', 'lianhau-lu', 'loquacity', 'madorn',
+    'malini-k-bhandaru', 'manjeet-s-bhatia', 'matt-O', 'rackerhacker',
+    'mikalstill', 'john-d-perkins', 'mrda', 'npustchi', 'neillc', 'rnortman',
+    'ntpttr', 'jesse-pretorius', 'paul-dardeau', 'paul-e-luse', 'r1chardj0n3s',
+    'ronald-de-rose', 'ionosphere80', 'sfinucane', 'shashirekha-j-gundur',
+    'sumant-murke', 'amy-marrich', 'steve-lewis', 'o-tony', 'xek',
+    'yalei-wang', 'yamahata', 'saisrikiran-mudigonda', 'electrocucaracha',
+    'castulo-martinez', 'joshua-l-white'
 ]
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description='Generate a report from Stackalytics on the collaboration '
+                    'between two organizations')
+    parser.add_argument(
+        '--reporting-period', type=int, default=7,
+        help='Period (in days) to report on.')
+    args = parser.parse_args()
 
     # FIXME(lbragstad): For some reason the following request doesn't work
     # against stackalytics with python requests. It does work if you copy that
@@ -79,7 +45,7 @@ def main():
     # resp.raise_for_status()
 
     utc_today = datetime.datetime.utcnow()
-    delta = datetime.timedelta(days=7)
+    delta = datetime.timedelta(days=args.reporting_period)
     week_ago = utc_today - delta
     epoch_dt = datetime.datetime(1970, 1, 1)
     today_epoch = int((utc_today - epoch_dt).total_seconds())
@@ -102,9 +68,11 @@ def main():
         total_engineers += 1
         total_reviews += osic_report[engineer].get('metric')
 
-    data = {'e': total_engineers, 'r': total_reviews}
-    msg = ('%(e)s engineers did %(r)d code reviews in the last 7 days' % data)
-    print msg
+    print(
+        '%(e)d engineers did %(r)d code reviews in the last %(days)d days' % {
+            'e': total_engineers,
+            'days': args.reporting_period,
+            'r': total_reviews})
 
 
 if __name__ == '__main__':
