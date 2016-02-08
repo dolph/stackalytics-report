@@ -5,6 +5,8 @@ import json
 import requests
 
 
+DEBUG = False
+
 LAUNCHPAD_IDS = [
     'xuhj', 'ankur-gupta-f', 'annegentle', 'alexandra-settle',
     'byron-mccollum', 'bmoss', 'brian-rosmaita', 'kevin-carter', 'daz',
@@ -37,7 +39,20 @@ def compute_date_range(days_ago):
     return start_epoch, end_epoch
 
 
+def GET(url, params):
+    resp = requests.get(url, params=params)
+    if DEBUG:
+        print('GET %s' % resp.url)
+    resp.raise_for_status()
+    data = resp.json()
+    if DEBUG:
+        print(json.dumps(data, sort_keys=True, indent=4))
+    return data
+
+
 def main():
+    global DEBUG
+
     parser = argparse.ArgumentParser(
         description='Generate a report from Stackalytics on the collaboration '
                     'between two organizations')
@@ -48,6 +63,7 @@ def main():
         '--reporting-period', type=int, default=7,
         help='Period (in days) to report on.')
     args = parser.parse_args()
+    DEBUG = args.debug
 
     # FIXME(lbragstad): For some reason the following request doesn't work
     # against stackalytics with python requests. It does work if you copy that
@@ -68,13 +84,8 @@ def main():
     params = dict()
     params['start_date'], params['end_date'] = compute_date_range(
         args.reporting_period)
-    resp = requests.get(url, params=params)
-    if args.debug:
-        print('GET %s' % resp.url)
-    resp.raise_for_status()
-    data = resp.json()
-    if args.debug:
-        print(json.dumps(data, sort_keys=True, indent=4))
+    data = GET(url, params)
+
     osic_report = dict()
     for engineer in data['stats']:
         for lp_id in LAUNCHPAD_IDS:
