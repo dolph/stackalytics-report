@@ -80,11 +80,10 @@ def main():
     # resp = requests.get(url)
     # resp.raise_for_status()
 
-    url = 'http://stackalytics.com/api/1.0/stats/engineers'
     params = dict()
     params['start_date'], params['end_date'] = compute_date_range(
         args.reporting_period)
-    data = GET(url, params)
+    data = GET('http://stackalytics.com/api/1.0/stats/engineers', params)
 
     osic_report = dict()
     for engineer in data['stats']:
