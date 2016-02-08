@@ -72,9 +72,14 @@ def main():
     for engineer in osic_report:
         total_engineers += 1
         total_reviews += osic_report[engineer].get('metric')
-
     print(
-        '%(e)d engineers did %(r)d code reviews in the last %(days)d days' % {
+        '%(days)d Day Report (%(start)s to %(end)s)\n' % {
+            'days': args.reporting_period,
+            'start': params['start_date'],
+            'end': params['end_date'],
+        })
+    print(
+        '* %(e)d engineers did %(r)d code reviews.' % {
             'e': total_engineers,
             'days': args.reporting_period,
             'r': total_reviews})
