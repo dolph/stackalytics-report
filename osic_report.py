@@ -20,6 +20,12 @@ LAUNCHPAD_IDS = [
     'castulo-martinez', 'joshua-l-white'
 ]
 
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+
+def format_timestamp(timestamp):
+    return datetime.datetime.fromtimestamp(timestamp).strftime(DATETIME_FORMAT)
+
 
 def compute_date_range(days_ago):
     utc_today = datetime.datetime.utcnow()
@@ -83,8 +89,8 @@ def main():
     print(
         '%(days)d Day Report (%(start)s to %(end)s)\n' % {
             'days': args.reporting_period,
-            'start': params['start_date'],
-            'end': params['end_date'],
+            'start': format_timestamp(params['start_date']),
+            'end': format_timestamp(params['end_date']),
         })
     print(
         '* %(e)d engineers did %(r)d code reviews.' % {
