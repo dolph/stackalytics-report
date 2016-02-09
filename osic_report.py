@@ -1,36 +1,60 @@
 import argparse
 import datetime
-import json
 
 import requests
 
 
 DEBUG = False
 
-LAUNCHPAD_IDS = [
-    'xuhj', 'ankur-gupta-f', 'annegentle', 'alexandra-settle',
-    'byron-mccollum', 'bmoss', 'brian-rosmaita', 'kevin-carter', 'daz',
-    'wei-d-chen', 'dolph', 'dstanek', 'egle', 'ganesh-mahalingam', 'gus',
-    'hemanth-makkapati', 'joshua.hesketh', 'johngarbutt', 'jim-rollenhagen',
-    'kennycjohnston', 'ldbragst', 'lianhau-lu', 'loquacity', 'madorn',
-    'malini-k-bhandaru', 'manjeet-s-bhatia', 'matt-O', 'rackerhacker',
-    'mikalstill', 'john-d-perkins', 'mrda', 'npustchi', 'neillc', 'rnortman',
-    'ntpttr', 'jesse-pretorius', 'paul-dardeau', 'paul-e-luse', 'r1chardj0n3s',
-    'ronald-de-rose', 'ionosphere80', 'sfinucane', 'shashirekha-j-gundur',
-    'sumant-murke', 'amy-marrich', 'steve-lewis', 'o-tony', 'xek',
-    'yalei-wang', 'yamahata', 'saisrikiran-mudigonda', 'electrocucaracha',
-    'castulo-martinez', 'joshua-l-white'
-]
+DATETIME_FORMAT = '%Y-%m-%d %I%p'
 
-DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+# stackalytics.com is way faster than stackalytics.o.o
+API_ENDPOINT = 'http://stackalytics.com/api/1.0'
+
+ACTIVITY_ATTRIBUTES = (
+    'blueprint_id_count',
+    'branch',
+    'bug_id_count',
+    'company_name',
+    'module',
+    'parent_blueprint_id_count',
+    'parent_branch',
+    'parent_bug_id_count',
+    'parent_company_name',
+    'parent_module',
+    'parent_number',
+    'parent_open',
+    'parent_project',
+    'parent_record_type',
+    'parent_release',
+    'parent_status',
+    'patch',
+    'patch_blueprint_id_count',
+    'patch_branch',
+    'patch_bug_id_count',
+    'patch_company_name',
+    'patch_number',
+    'patch_record_type',
+    'patch_week',
+    'record_type',
+    'release',
+    'type',
+)
 
 
 def format_timestamp(timestamp):
-    return datetime.datetime.fromtimestamp(timestamp).strftime(DATETIME_FORMAT)
+    s = datetime.datetime.fromtimestamp(timestamp).strftime(DATETIME_FORMAT)
+
+    # Post-process to replace '...-2016 02PM' with '...-2016 2PM'
+    return s.replace(' 0', ' ')
 
 
 def compute_date_range(days_ago):
     utc_today = datetime.datetime.utcnow()
+
+    # Run reports from the top of the hour.
+    utc_today = utc_today.replace(minute=0, second=0, microsecond=0)
+
     delta = datetime.timedelta(days=days_ago)
     epoch_dt = datetime.datetime(1970, 1, 1)
 
@@ -45,39 +69,86 @@ def GET(url, params):
         print('GET %s' % resp.url)
     resp.raise_for_status()
     data = resp.json()
-    if DEBUG:
-        print(json.dumps(data, sort_keys=True, indent=4))
     return data
 
 
+def report_summary(events):
+    print('%d events.' % len(events))
+
+
+def report_interactions(events, companies):
+    code_review_interactions = set()
+    project_interactions = set()
+    interaction_types = set()
+    for event in events:
+        if set(companies).issubset(set(event['companies_involved'])):
+            project_interactions.add(event['parent_project'])
+            if event['type'] == 'Code-Review':
+                # Parent number is the code review number.
+                code_review_interactions.add(int(event['parent_number']))
+            else:
+                interaction_types.add(event['type'])
+
+    print('%d code review interactions in the following projects:' %
+          len(code_review_interactions))
+    for project in project_interactions:
+        print('- %s' % project)
+    print('Other types of interaction: %r' % interaction_types)
+
+
+def activity(start_date, end_date):
+    per_page = 1000
+    page = 0
+
+    while True:
+        params = dict(
+            page_size=per_page,
+            start_record=page * per_page,
+            start_date=start_date,
+            end_date=end_date)
+
+        data = GET(API_ENDPOINT + '/activity', params)
+        events = data['activity']
+
+        for event in events:
+            yield event
+
+        if not events or len(events) < per_page:
+            # Incomplete result set, we're done!
+            return
+
+        page += 1
+
+
 def main(args):
-    params = dict()
-    params['start_date'], params['end_date'] = compute_date_range(
-        args.reporting_period)
-    data = GET('http://stackalytics.com/api/1.0/stats/engineers', params)
+    filtered_events = []
+    start_date, end_date = compute_date_range(args.reporting_period)
+    for event in activity(start_date, end_date):
+        # Filter out the attributes we don't care about.
+        for key in event.keys():
+            if key not in ACTIVITY_ATTRIBUTES:
+                del event[key]
 
-    osic_report = dict()
-    for engineer in data['stats']:
-        for lp_id in LAUNCHPAD_IDS:
-            if lp_id in engineer['id']:
-                osic_report[engineer['id']] = engineer
+        # Filter out patches that do not involve our target organizations.
+        event['companies_involved'] = list(set([
+            event['company_name'],
+            event['patch_company_name'],
+            event['parent_company_name']]))
+        if not set(event['companies_involved']).intersection(args.companies):
+            continue
 
-    total_reviews = 0
-    total_engineers = 0
-    for engineer in osic_report:
-        total_engineers += 1
-        total_reviews += osic_report[engineer].get('metric')
+        # print(json.dumps(event, indent=4, sort_keys=True))
+        filtered_events.append(event)
+
     print(
         '%(days)d Day Report (%(start)s to %(end)s)\n' % {
             'days': args.reporting_period,
-            'start': format_timestamp(params['start_date']),
-            'end': format_timestamp(params['end_date']),
+            'start': format_timestamp(start_date),
+            'end': format_timestamp(end_date),
         })
-    print(
-        '* %(e)d engineers did %(r)d code reviews.' % {
-            'e': total_engineers,
-            'days': args.reporting_period,
-            'r': total_reviews})
+
+    report_summary(filtered_events)
+    report_interactions(filtered_events, args.companies)
 
 
 if __name__ == '__main__':
@@ -90,6 +161,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--reporting-period', type=int, default=7,
         help='Period (in days) to report on.')
+    parser.add_argument(
+        'companies', nargs=argparse.REMAINDER,
+        help='Specify companies to filter on.')
     args = parser.parse_args()
     DEBUG = args.debug
     main(args)
