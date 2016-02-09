@@ -96,12 +96,20 @@ def GET(url, params):
 
 
 def report_interactions(events, companies):
+    projects = dict()
     code_review_interactions = set()
     contributors = set()
     project_interactions = set()
     interaction_types = set()
     for event in events:
         if set(companies).issubset(set(event['companies_involved'])):
+            project = projects.setdefault(event['parent_project'], {})
+
+            for company in companies:
+                for role in ('authors', 'reviewers'):
+                    project.setdefault(role, {})
+                    project[role].setdefault(company, set())
+
             project_interactions.add(event['parent_project'])
             if event['type'] in GERRIT_EVENT_TYPES:
                 # Parent number is the code review number.
@@ -113,14 +121,35 @@ def report_interactions(events, companies):
                 if event['%scompany_name' % prefix] in companies:
                     contributors.add(event['%sgerrit_id' % prefix])
 
+            if event['company_name'] in companies:
+                project['reviewers'][event['company_name']].add(
+                    event['gerrit_id'])
+
+            if event['parent_company_name'] in companies:
+                project['authors'][event['parent_company_name']].add(
+                    event['parent_gerrit_id'])
+
+            if event['patch_company_name'] in companies:
+                project['authors'][event['patch_company_name']].add(
+                    event['patch_gerrit_id'])
+
     print(
-        '%d contributors collaborated in %d code reviews in the following '
+        '%d contributors collaborated on %d patches in the following '
         'projects:\n' % (
             len(contributors),
             len(code_review_interactions)))
 
     for project in sorted(list(project_interactions)):
-        print('- %s' % project)
+        msg = []
+        for company in companies:
+            for role in ('authors', 'reviewers'):
+                count = len(projects[project][role][company])
+                if count:
+                    msg.append('%d %s %s' % (
+                        count,
+                        company,
+                        role if count > 1 else role[:-1]))
+        print('- %s (%s)' % (project, ', '.join(msg)))
 
     if interaction_types:
         print('NOTE: Other types of interaction: %r' % interaction_types)
