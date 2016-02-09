@@ -8,7 +8,7 @@ import requests
 
 DEBUG = False
 
-DATETIME_FORMAT = '%Y-%m-%d %I%p'
+DATETIME_FORMAT = '%Y-%m-%d %I%p UTC'
 
 # stackalytics.com is way faster than stackalytics.o.o
 API_ENDPOINT = 'http://stackalytics.com/api/1.0'
@@ -19,7 +19,9 @@ ACTIVITY_ATTRIBUTES = (
     'bug_id_count',
     'company_name',
     'module',
+    'gerrit_id',
     'parent_blueprint_id_count',
+    'parent_gerrit_id',
     'parent_branch',
     'parent_bug_id_count',
     'parent_company_name',
@@ -35,6 +37,7 @@ ACTIVITY_ATTRIBUTES = (
     'patch_branch',
     'patch_bug_id_count',
     'patch_company_name',
+    'patch_gerrit_id',
     'patch_number',
     'patch_record_type',
     'patch_week',
@@ -42,6 +45,9 @@ ACTIVITY_ATTRIBUTES = (
     'release',
     'type',
 )
+
+GERRIT_EVENT_TYPES = (
+    'Code-Review', 'Workflow', 'Self-Code-Review', 'Self-Workflow')
 
 
 CACHE_DIR = '/tmp/stackalytics-collaboration-report'
@@ -89,28 +95,35 @@ def GET(url, params):
     return data
 
 
-def report_summary(events):
-    print('%d events.' % len(events))
-
-
 def report_interactions(events, companies):
     code_review_interactions = set()
+    contributors = set()
     project_interactions = set()
     interaction_types = set()
     for event in events:
         if set(companies).issubset(set(event['companies_involved'])):
             project_interactions.add(event['parent_project'])
-            if event['type'] == 'Code-Review':
+            if event['type'] in GERRIT_EVENT_TYPES:
                 # Parent number is the code review number.
                 code_review_interactions.add(int(event['parent_number']))
             else:
                 interaction_types.add(event['type'])
 
-    print('%d code review interactions in the following projects:' %
-          len(code_review_interactions))
+            for prefix in ('', 'parent_', 'patch_'):
+                if event['%scompany_name' % prefix] in companies:
+                    contributors.add(event['%sgerrit_id' % prefix])
+
+    print(
+        '%d contributors collaborated in %d code reviews in the following '
+        'projects:\n' % (
+            len(contributors),
+            len(code_review_interactions)))
+
     for project in project_interactions:
         print('- %s' % project)
-    print('Other types of interaction: %r' % interaction_types)
+
+    if interaction_types:
+        print('NOTE: Other types of interaction: %r' % interaction_types)
 
 
 def activity(start_date, end_date):
@@ -164,7 +177,6 @@ def main(args):
             'end': format_timestamp(end_date),
         })
 
-    report_summary(filtered_events)
     report_interactions(filtered_events, args.companies)
 
 
