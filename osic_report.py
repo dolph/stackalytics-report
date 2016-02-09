@@ -119,7 +119,7 @@ def report_interactions(events, companies):
             len(contributors),
             len(code_review_interactions)))
 
-    for project in project_interactions:
+    for project in sorted(list(project_interactions)):
         print('- %s' % project)
 
     if interaction_types:
