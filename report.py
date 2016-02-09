@@ -97,9 +97,8 @@ def GET(url, params):
 
 def report_interactions(events, companies):
     projects = dict()
-    code_review_interactions = set()
+    patches = set()
     contributors = set()
-    project_interactions = set()
     interaction_types = set()
     for event in events:
         if set(companies).issubset(set(event['companies_involved'])):
@@ -110,10 +109,9 @@ def report_interactions(events, companies):
                     project.setdefault(role, {})
                     project[role].setdefault(company, set())
 
-            project_interactions.add(event['parent_project'])
             if event['type'] in GERRIT_EVENT_TYPES:
                 # Parent number is the code review number.
-                code_review_interactions.add(int(event['parent_number']))
+                patches.add(int(event['parent_number']))
             else:
                 interaction_types.add(event['type'])
 
@@ -134,12 +132,13 @@ def report_interactions(events, companies):
                     event['patch_gerrit_id'])
 
     print(
-        '%d contributors collaborated on %d patches in the following '
+        '%d contributors collaborated on %d patches in the following %d '
         'projects:\n' % (
             len(contributors),
-            len(code_review_interactions)))
+            len(patches),
+            len(projects)))
 
-    for project in sorted(list(project_interactions)):
+    for project in sorted(projects.keys()):
         msg = []
         for company in companies:
             for role in ('authors', 'reviewers'):
