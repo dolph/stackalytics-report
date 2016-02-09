@@ -1,6 +1,8 @@
 import argparse
 import datetime
+import os.path
 
+import dogpile.cache
 import requests
 
 
@@ -42,6 +44,20 @@ ACTIVITY_ATTRIBUTES = (
 )
 
 
+CACHE_DIR = '/tmp/stackalytics-collaboration-report'
+if not os.path.exists(CACHE_DIR):
+    print('Creating %s' % CACHE_DIR)
+    os.makedirs(CACHE_DIR, 0o0700)
+
+CACHE = dogpile.cache.make_region().configure(
+    'dogpile.cache.dbm',
+    expiration_time=3600,
+    arguments={
+        'filename': '%s/cache.dbm' % CACHE_DIR,
+    }
+)
+
+
 def format_timestamp(timestamp):
     s = datetime.datetime.fromtimestamp(timestamp).strftime(DATETIME_FORMAT)
 
@@ -63,6 +79,7 @@ def compute_date_range(days_ago):
     return start_epoch, end_epoch
 
 
+@CACHE.cache_on_arguments()
 def GET(url, params):
     resp = requests.get(url, params=params)
     if DEBUG:
