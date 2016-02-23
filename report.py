@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import json
 import os.path
 
 import dogpile.cache
@@ -50,7 +51,7 @@ GERRIT_EVENT_TYPES = (
     'Code-Review', 'Workflow', 'Self-Code-Review', 'Self-Workflow')
 
 
-CACHE_DIR = '/tmp/stackalytics-collaboration-report'
+CACHE_DIR = '/tmp/stackalytics-report'
 if not os.path.exists(CACHE_DIR):
     print('Creating %s' % CACHE_DIR)
     os.makedirs(CACHE_DIR, 0o0700)
@@ -95,63 +96,53 @@ def GET(url, params):
     return data
 
 
-def report_interactions(events, companies):
-    projects = dict()
-    patches = set()
-    contributors = set()
-    interaction_types = set()
+def debug(d):
+    print(json.dumps(d, indent=4, sort_keys=True))
+
+
+def summarize(events, gerrit_user_ids):
     for event in events:
-        if set(companies).issubset(set(event['companies_involved'])):
-            project = projects.setdefault(event['parent_project'], {})
+        if not gerrit_user_ids or event['gerrit_id'] in gerrit_user_ids:
+            # When?
+            message = ['[{date_str}]']
 
-            for company in companies:
-                for role in ('authors', 'reviewers'):
-                    project.setdefault(role, {})
-                    project[role].setdefault(company, set())
+            # Who?
+            message.append('{gerrit_id} ({company_name})')
 
-            if event['type'] in GERRIT_EVENT_TYPES:
-                # Parent number is the code review number.
-                patches.add(int(event['parent_number']))
+            # What?
+            if event['type'] in ('Workflow', 'Self-Workflow'):
+                if event['value'] == -1:
+                    message.append('WIP\'d')
+                elif event['value'] == 1:
+                    message.append('approved')
+                else:
+                    debug(event)
+                    quit()
+            elif event['type'] in ('Code-Review', 'Self-Code-Review'):
+                if event['value'] == 2:
+                    message.append('+2\'d')
+                elif event['value'] == 1:
+                    message.append('+1\'d')
+                elif event['value'] == -1:
+                    message.append('-1\'d')
+                elif event['value'] == -2:
+                    message.append('blocked')
+                else:
+                    debug(event)
+                    quit()
+            elif event['type'] in ('Abandon', 'Self-Abandon'):
+                message.append('abandoned')
             else:
-                interaction_types.add(event['type'])
+                debug(event)
+                quit()
 
-            for prefix in ('', 'parent_', 'patch_'):
-                if event['%scompany_name' % prefix] in companies:
-                    contributors.add(event['%sgerrit_id' % prefix])
+            message.append('"{parent_subject}" ({parent_number})')
 
-            if event['company_name'] in companies:
-                project['reviewers'][event['company_name']].add(
-                    event['gerrit_id'])
+            # Where?
+            message.append('in {module}.')
 
-            if event['parent_company_name'] in companies:
-                project['authors'][event['parent_company_name']].add(
-                    event['parent_gerrit_id'])
-
-            if event['patch_company_name'] in companies:
-                project['authors'][event['patch_company_name']].add(
-                    event['patch_gerrit_id'])
-
-    print(
-        '%d contributors collaborated on %d patches in the following %d '
-        'projects:\n' % (
-            len(contributors),
-            len(patches),
-            len(projects)))
-
-    for project in sorted(projects.keys()):
-        msg = []
-        for company in companies:
-            for role in ('authors', 'reviewers'):
-                count = len(projects[project][role][company])
-                if count:
-                    msg.append('%d %s %s' % (
-                        count,
-                        company,
-                        role if count > 1 else role[:-1]))
-        print('- %s (%s)' % (project, ', '.join(msg)))
-
-    if interaction_types:
-        print('NOTE: Other types of interaction: %r' % interaction_types)
+            message = u' '.join(message)
+            print(message.format(**event))
 
 
 def activity(start_date, end_date):
@@ -169,6 +160,13 @@ def activity(start_date, end_date):
         events = data['activity']
 
         for event in events:
+            """
+            # Filter out the attributes we don't care about.
+            for key in event.keys():
+                if key not in ACTIVITY_ATTRIBUTES:
+                    del event[key]
+            """
+
             yield event
 
         if not events or len(events) < per_page:
@@ -179,39 +177,23 @@ def activity(start_date, end_date):
 
 
 def main(args):
-    filtered_events = []
     start_date, end_date = compute_date_range(args.reporting_period)
-    for event in activity(start_date, end_date):
-        # Filter out the attributes we don't care about.
-        for key in event.keys():
-            if key not in ACTIVITY_ATTRIBUTES:
-                del event[key]
-
-        # Filter out patches that do not involve our target organizations.
-        event['companies_involved'] = list(set([
-            event['company_name'],
-            event['patch_company_name'],
-            event['parent_company_name']]))
-        if not set(event['companies_involved']).intersection(args.companies):
-            continue
-
-        # print(json.dumps(event, indent=4, sort_keys=True))
-        filtered_events.append(event)
 
     print(
         '%(days)d Day Report (%(start)s to %(end)s)\n' % {
             'days': args.reporting_period,
             'start': format_timestamp(start_date),
             'end': format_timestamp(end_date),
-        })
+        }
+    )
 
-    report_interactions(filtered_events, args.companies)
+    summarize(activity(start_date, end_date), args.gerrit_user_ids)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Generate a report from Stackalytics on the collaboration '
-                    'between two organizations')
+        description='Generate a report from Stackalytics on contributor '
+                    'activity.')
     parser.add_argument(
         '--debug', action='store_true', default=False,
         help='Enable debugging output.')
@@ -219,8 +201,8 @@ if __name__ == '__main__':
         '--reporting-period', type=int, default=7,
         help='Period (in days) to report on.')
     parser.add_argument(
-        'companies', nargs=argparse.REMAINDER,
-        help='Specify companies to filter on.')
+        'gerrit_user_ids', nargs=argparse.REMAINDER,
+        help='Specify gerrit users to filter on.')
     args = parser.parse_args()
     DEBUG = args.debug
     main(args)
