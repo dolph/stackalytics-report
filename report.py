@@ -179,11 +179,11 @@ def main(args):
     start_date, end_date = compute_date_range(args.reporting_period)
 
     print(
-        '%(days)d Day Report (%(start)s to %(end)s)\n' % {
+        '{days:d} Day Report ({start} to {end})\n'.format(**{
             'days': args.reporting_period,
             'start': format_timestamp(start_date),
             'end': format_timestamp(end_date),
-        }
+        })
     )
 
     summarize(activity(start_date, end_date), args.gerrit_user_ids)
