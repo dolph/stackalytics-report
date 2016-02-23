@@ -53,7 +53,6 @@ GERRIT_EVENT_TYPES = (
 
 CACHE_DIR = '/tmp/stackalytics-report'
 if not os.path.exists(CACHE_DIR):
-    print('Creating %s' % CACHE_DIR)
     os.makedirs(CACHE_DIR, 0o0700)
 
 CACHE = dogpile.cache.make_region().configure(
