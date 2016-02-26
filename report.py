@@ -14,39 +14,6 @@ DATETIME_FORMAT = '%Y-%m-%d %I%p UTC'
 # stackalytics.com is way faster than stackalytics.o.o
 API_ENDPOINT = 'http://stackalytics.com/api/1.0'
 
-ACTIVITY_ATTRIBUTES = (
-    'blueprint_id_count',
-    'branch',
-    'bug_id_count',
-    'company_name',
-    'module',
-    'gerrit_id',
-    'parent_blueprint_id_count',
-    'parent_gerrit_id',
-    'parent_branch',
-    'parent_bug_id_count',
-    'parent_company_name',
-    'parent_module',
-    'parent_number',
-    'parent_open',
-    'parent_project',
-    'parent_record_type',
-    'parent_release',
-    'parent_status',
-    'patch',
-    'patch_blueprint_id_count',
-    'patch_branch',
-    'patch_bug_id_count',
-    'patch_company_name',
-    'patch_gerrit_id',
-    'patch_number',
-    'patch_record_type',
-    'patch_week',
-    'record_type',
-    'release',
-    'type',
-)
-
 GERRIT_EVENT_TYPES = (
     'Code-Review', 'Workflow', 'Self-Code-Review', 'Self-Workflow')
 
@@ -160,13 +127,6 @@ def activity(start_date, end_date):
         events = data['activity']
 
         for event in events:
-            """
-            # Filter out the attributes we don't care about.
-            for key in event.keys():
-                if key not in ACTIVITY_ATTRIBUTES:
-                    del event[key]
-            """
-
             yield event
 
         if not events or len(events) < per_page:
