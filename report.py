@@ -68,48 +68,56 @@ def debug(d):
 
 def summarize(events, gerrit_user_ids, project):
     for event in events:
-        if not gerrit_user_ids or event['gerrit_id'] in gerrit_user_ids:
-            if not project or event['module'] == project:
-                # When?
-                message = ['[{date_str}]']
+        # If we're filtering by gerrit user IDs, then skip events that do not
+        # include the users we're looking for.
+        if gerrit_user_ids and event['gerrit_id'] not in gerrit_user_ids:
+            continue
 
-                # Who?
-                message.append('{gerrit_id} ({company_name})')
+        # If we're filtering by project, then skip events that do not include
+        # the project we're looking for.
+        if project and event['module'] != project:
+            continue
 
-                # What?
-                if event['type'] in ('Workflow', 'Self-Workflow'):
-                    if event['value'] == -1:
-                        message.append('WIP\'d')
-                    elif event['value'] == 1:
-                        message.append('approved')
-                    else:
-                        debug(event)
-                        quit()
-                elif event['type'] in ('Code-Review', 'Self-Code-Review'):
-                    if event['value'] == 2:
-                        message.append('+2\'d')
-                    elif event['value'] == 1:
-                        message.append('+1\'d')
-                    elif event['value'] == -1:
-                        message.append('-1\'d')
-                    elif event['value'] == -2:
-                        message.append('blocked')
-                    else:
-                        debug(event)
-                        quit()
-                elif event['type'] in ('Abandon', 'Self-Abandon'):
-                    message.append('abandoned')
-                else:
-                    debug(event)
-                    quit()
+        # When?
+        message = ['[{date_str}]']
 
-                message.append('"{parent_subject}" ({parent_number})')
+        # Who?
+        message.append('{gerrit_id} ({company_name})')
 
-                # Where?
-                message.append('in {module}.')
+        # What?
+        if event['type'] in ('Workflow', 'Self-Workflow'):
+            if event['value'] == -1:
+                message.append('WIP\'d')
+            elif event['value'] == 1:
+                message.append('approved')
+            else:
+                debug(event)
+                quit()
+        elif event['type'] in ('Code-Review', 'Self-Code-Review'):
+            if event['value'] == 2:
+                message.append('+2\'d')
+            elif event['value'] == 1:
+                message.append('+1\'d')
+            elif event['value'] == -1:
+                message.append('-1\'d')
+            elif event['value'] == -2:
+                message.append('blocked')
+            else:
+                debug(event)
+                quit()
+        elif event['type'] in ('Abandon', 'Self-Abandon'):
+            message.append('abandoned')
+        else:
+            debug(event)
+            quit()
 
-                message = u' '.join(message)
-                print(message.format(**event))
+        message.append('"{parent_subject}" ({parent_number})')
+
+        # Where?
+        message.append('in {module}.')
+
+        message = u' '.join(message)
+        print(message.format(**event))
 
 
 def activity(start_date, end_date):
