@@ -147,7 +147,10 @@ def main(args):
         })
     )
 
-    summarize(activity(start_date, end_date), args.gerrit_user_ids, args.project)
+    summarize(
+        activity(start_date, end_date),
+        args.gerrit_user_ids,
+        args.project)
 
 
 if __name__ == '__main__':
